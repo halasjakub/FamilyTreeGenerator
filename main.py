@@ -69,17 +69,29 @@ def open_existing_file():
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
 
-            # SQL query to get the first 10 records
+            # SQL query to get the first 10 records from the person table
             cursor.execute("SELECT id, surname, given, gender FROM person LIMIT 10")
-            records = cursor.fetchall()
+            person_records = cursor.fetchall()
 
-            # Display the first 10 records in the terminal
-            if records:
-                print("\nFirst 10 records:")
-                for record in records:
+            # Display the first 10 records from the person table in the terminal
+            if person_records:
+                print("\nFirst 10 records from 'person' table:")
+                for record in person_records:
                     print(record)
             else:
                 print("No records in the 'person' table.")
+
+            # SQL query to get the first 10 records from the relations table
+            cursor.execute("SELECT id_relation, id_husband, id_wife FROM relations LIMIT 10")
+            relation_records = cursor.fetchall()
+
+            # Display the first 10 records from the relations table in the terminal
+            if relation_records:
+                print("\nFirst 10 records from 'relations' table:")
+                for record in relation_records:
+                    print(record)
+            else:
+                print("No records in the 'relations' table.")
 
             conn.close()  # Close the connection
         except sqlite3.Error as e:
