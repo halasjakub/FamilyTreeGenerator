@@ -365,13 +365,19 @@ def open_child_window():
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
 
-                    # Insert relationship into 'family' table (assume this is the child of the selected marriage)
+                    # Get husband and wife IDs from the selected marriage
+                    husband_id = marriage_records[selected_marriage_id - 1][1]
+                    wife_id = marriage_records[selected_marriage_id - 1][2]
+
+                    # Insert the child into the 'family' table
                     cursor.execute(
                         "INSERT INTO family (id_parent1, id_parent2, id_child) VALUES (?, ?, ?)",
-                        (marriage_records[selected_marriage_id - 1][1], marriage_records[selected_marriage_id - 1][2], selected_person_id)
+                        (husband_id, wife_id, selected_person_id)
                     )
                     conn.commit()
-                    print(f"Child {selected_person_id} added to Marriage ID: {selected_marriage_id}")
+
+                    print(f"Child {selected_person_id} added to Marriage ID: {selected_marriage_id} (Husband: {husband_id}, Wife: {wife_id})")
+
                     conn.close()
 
                 except sqlite3.Error as e:
