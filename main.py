@@ -24,28 +24,28 @@ def open_new_window():
 
             # Create the "person" table if it doesn't exist
             create_person_table_query = '''
-            CREATE TABLE IF NOT EXISTS person (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                surname TEXT NOT NULL,
-                given TEXT NOT NULL,
-                gender TEXT CHECK(gender IN ('male', 'female')) NOT NULL
-            );
+                CREATE TABLE IF NOT EXISTS person (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    surname TEXT NOT NULL,
+                    given TEXT NOT NULL,
+                    gender TEXT CHECK(gender IN ('male', 'female')) NOT NULL
+                );
             '''
             conn.execute(create_person_table_query)
             print("Table 'person' created.")
 
-            # Create the "relations" table if it doesn't exist
-            create_relations_table_query = '''
-            CREATE TABLE IF NOT EXISTS relations (
-                id_relation INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_husband INTEGER NOT NULL,
-                id_wife INTEGER NOT NULL,
-                FOREIGN KEY (id_husband) REFERENCES person(id),
-                FOREIGN KEY (id_wife) REFERENCES person(id)
-            );
+            # Create the "marriage" table if it doesn't exist
+            create_marriage_table_query = '''
+                CREATE TABLE IF NOT EXISTS marriage (
+                    id_relation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_husband INTEGER NOT NULL,
+                    id_wife INTEGER NOT NULL,
+                    FOREIGN KEY (id_husband) REFERENCES person(id),
+                    FOREIGN KEY (id_wife) REFERENCES person(id)
+                );
             '''
-            conn.execute(create_relations_table_query)
-            print("Table 'relations' created.")
+            conn.execute(create_marriage_table_query)
+            print("Table 'marriage' created.")
 
             conn.close()  # Close the connection
         except sqlite3.Error as e:
@@ -81,17 +81,17 @@ def open_existing_file():
             else:
                 print("No records in the 'person' table.")
 
-            # SQL query to get the first 10 records from the relations table
-            cursor.execute("SELECT id_relation, id_husband, id_wife FROM relations LIMIT 10")
+            # SQL query to get the first 10 records from the marriage table
+            cursor.execute("SELECT id_relation, id_husband, id_wife FROM marriage LIMIT 10")
             relation_records = cursor.fetchall()
 
-            # Display the first 10 records from the relations table in the terminal
+            # Display the first 10 records from the marriage table in the terminal
             if relation_records:
-                print("\nFirst 10 records from 'relations' table:")
+                print("\nFirst 10 records from 'marriage' table:")
                 for record in relation_records:
                     print(record)
             else:
-                print("No records in the 'relations' table.")
+                print("No records in the 'marriage' table.")
 
             conn.close()  # Close the connection
         except sqlite3.Error as e:
@@ -118,7 +118,10 @@ def open_person_window():
                 cursor.execute("INSERT INTO person (surname, given, gender) VALUES (?, ?, ?)",
                                (surname, given, gender))
                 conn.commit()
-                print(f"Saved person: {surname} {given}, Gender: {gender}")
+
+                # Fetch the ID of the last inserted person
+                person_id = cursor.lastrowid
+                print(f"Saved person: {surname} {given}, Gender: {gender}, ID: {person_id}")
 
                 conn.close()  # Close the connection
             except sqlite3.Error as e:
@@ -161,103 +164,81 @@ def open_person_window():
 
 
 def open_relation_window():
-    # Function to open a window for selecting husband and wife
     if db_path is None:
         print("Database has not been opened or created.")
         return
 
-    def save_relation():
-        husband_id = husband_listbox.curselection()
-        wife_id = wife_listbox.curselection()
-
-        if husband_id and wife_id:
-            husband_id = husband_listbox.get(husband_id)
-            wife_id = wife_listbox.get(wife_id)
-
-            # Save the relation to the database
-            try:
-                conn = sqlite3.connect(db_path)
-                cursor = conn.cursor()
-
-                # Insert the relation into the "relations" table
-                cursor.execute("INSERT INTO relations (id_husband, id_wife) VALUES (?, ?)", (husband_id, wife_id))
-                conn.commit()
-                print(f"Relation saved: Husband - {husband_id}, Wife - {wife_id}")
-
-                conn.close()  # Close the connection
-                relation_window.destroy()  # Close the window after saving the relation
-            except sqlite3.Error as e:
-                print(f"Failed to save relation: {e}")
-        else:
-            print("Select both husband and wife.")
-
-    # Create a new window for relations
     relation_window = tk.Toplevel(window)
     relation_window.title("Add Relation")
-    relation_window.geometry("600x300")
+    relation_window.geometry("400x300")
 
-    # Load list of males (husband) and females (wife)
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
 
-    cursor.execute("SELECT id, surname, given FROM person WHERE gender='male'")
-    husbands = cursor.fetchall()
-    cursor.execute("SELECT id, surname, given FROM person WHERE gender='female'")
-    wives = cursor.fetchall()
+        cursor.execute("SELECT id, surname, given FROM person WHERE gender = 'male'")
+        male_records = cursor.fetchall()
 
-    conn.close()
+        cursor.execute("SELECT id, surname, given FROM person WHERE gender = 'female'")
+        female_records = cursor.fetchall()
 
-    # Listbox for males (left column)
-    husband_label = tk.Label(relation_window, text="Select Husband:")
-    husband_label.grid(row=0, column=0, padx=10, pady=10, sticky='w')
-    husband_listbox = tk.Listbox(relation_window, height=10, width=30)
-    for husband in husbands:
-        husband_listbox.insert(tk.END, f"{husband[1]} {husband[2]}")  # Display surname and given name
-    husband_listbox.grid(row=1, column=0, padx=10, pady=10)
+        if male_records:
+            male_listbox = tk.Listbox(relation_window)
+            male_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
-    # Button to confirm husband selection
-    def select_husband():
-        selected_husband = husband_listbox.curselection()
-        if selected_husband:
-            husband_name = husband_listbox.get(selected_husband)
-            husband_label_selected.config(text=f"Selected Husband: {husband_name}")
+            for record in male_records:
+                male_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
+
         else:
-            husband_label_selected.config(text="No husband selected")
+            print("No male records in the 'person' table.")
 
-    husband_button = tk.Button(relation_window, text="Confirm Husband", command=select_husband)
-    husband_button.grid(row=2, column=0, padx=10, pady=10)
+        if female_records:
+            female_listbox = tk.Listbox(relation_window)
+            female_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
-    # Label to display the selected husband
-    husband_label_selected = tk.Label(relation_window, text="Selected Husband: None")
-    husband_label_selected.grid(row=3, column=0, padx=10, pady=10)
+            for record in female_records:
+                female_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
 
-    # Listbox for females (right column)
-    wife_label = tk.Label(relation_window, text="Select Wife:")
-    wife_label.grid(row=0, column=1, padx=10, pady=10, sticky='w')
-    wife_listbox = tk.Listbox(relation_window, height=10, width=30)
-    for wife in wives:
-        wife_listbox.insert(tk.END, f"{wife[1]} {wife[2]}")  # Display surname and given name
-    wife_listbox.grid(row=1, column=1, padx=10, pady=10)
-
-    # Button to confirm wife selection
-    def select_wife():
-        selected_wife = wife_listbox.curselection()
-        if selected_wife:
-            wife_name = wife_listbox.get(selected_wife)
-            wife_label_selected.config(text=f"Selected Wife: {wife_name}")
         else:
-            wife_label_selected.config(text="No wife selected")
+            print("No female records in the 'person' table.")
 
-    wife_button = tk.Button(relation_window, text="Confirm Wife", command=select_wife)
-    wife_button.grid(row=2, column=1, padx=10, pady=10)
+        male_id = None
+        female_id = None
 
-    # Label to display the selected wife
-    wife_label_selected = tk.Label(relation_window, text="Selected Wife: None")
-    wife_label_selected.grid(row=3, column=1, padx=10, pady=10)
+        def on_male_selected(event):
+            nonlocal male_id
+            selected_male_indices = male_listbox.curselection()
+            if selected_male_indices:
+                selected_male = male_listbox.get(selected_male_indices)
+                male_id = selected_male.split(":")[0]
+                print(f"Selected Male ID: {male_id}")
 
-    # Button to save the relation
-    save_button = tk.Button(relation_window, text="Save Relation", command=save_relation)
-    save_button.grid(row=4, column=0, columnspan=2, padx=10, pady=20)
+        def on_female_selected(event):
+            nonlocal female_id
+            selected_female_indices = female_listbox.curselection()
+            if selected_female_indices:
+                selected_female = female_listbox.get(selected_female_indices)
+                female_id = selected_female.split(":")[0]
+                print(f"Selected Female ID: {female_id}")
+
+        male_listbox.bind('<<ListboxSelect>>', on_male_selected)
+        female_listbox.bind('<<ListboxSelect>>', on_female_selected)
+
+        def save_relation():
+            nonlocal male_id, female_id
+
+            if male_id and female_id:
+                print(f"Relation saved between Male ID: {male_id} and Female ID: {female_id}")
+            else:
+                print("Please select both a male and a female.")
+
+        save_button = tk.Button(relation_window, text="Save Relation", command=save_relation)
+        save_button.pack(pady=10)
+
+        conn.close()
+
+    except sqlite3.Error as e:
+        print(f"Failed to retrieve data: {e}")
 
 
 window = tk.Tk()
