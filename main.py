@@ -205,12 +205,20 @@ def open_relation_window():
         male_id = None
         female_id = None
 
+        male_label = tk.Label(relation_window, text="Selected Male: None")
+        male_label.pack(pady=10)
+
+        female_label = tk.Label(relation_window, text="Selected Female: None")
+        female_label.pack(pady=10)
+
         def on_male_selected(event):
             nonlocal male_id
             selected_male_indices = male_listbox.curselection()
             if selected_male_indices:
                 selected_male = male_listbox.get(selected_male_indices)
                 male_id = selected_male.split(":")[0]
+                male_name = selected_male.split(":")[1].strip()
+                male_label.config(text=f"Selected Male: {male_name}")
                 print(f"Selected Male ID: {male_id}")
 
         def on_female_selected(event):
@@ -219,6 +227,8 @@ def open_relation_window():
             if selected_female_indices:
                 selected_female = female_listbox.get(selected_female_indices)
                 female_id = selected_female.split(":")[0]
+                female_name = selected_female.split(":")[1].strip()
+                female_label.config(text=f"Selected Female: {female_name}")
                 print(f"Selected Female ID: {female_id}")
 
         male_listbox.bind('<<ListboxSelect>>', on_male_selected)
