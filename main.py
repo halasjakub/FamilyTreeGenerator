@@ -310,30 +310,77 @@ def open_child_window():
         cursor.execute("SELECT id, surname, given FROM person")
         person_records = cursor.fetchall()
 
+        # Listbox for marriages
         marriage_listbox = tk.Listbox(child_window)
         marriage_listbox.pack(side=tk.LEFT, padx=20, pady=20)
         for record in marriage_records:
             marriage_listbox.insert(tk.END, f"Marriage {record[0]}: Husband {record[1]}, Wife {record[2]}")
 
+        # Listbox for persons (children)
         person_listbox = tk.Listbox(child_window)
         person_listbox.pack(side=tk.LEFT, padx=20, pady=20)
         for record in person_records:
             person_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
 
-        def on_select_marriage(event):
-            selected_marriage_indices = marriage_listbox.curselection()
-            if selected_marriage_indices:
-                selected_marriage = marriage_listbox.get(selected_marriage_indices)
-                print(f"Selected Marriage: {selected_marriage}")
+        # Variables to hold selected records
+        selected_marriage_id = None
+        selected_person_id = None
 
+        # Labels to show selected records
+        marriage_label = tk.Label(child_window, text="Selected Marriage: None")
+        marriage_label.pack(pady=10)
+
+        person_label = tk.Label(child_window, text="Selected Person: None")
+        person_label.pack(pady=10)
+
+        # Event handler for marriage selection
+        def on_select_marriage(event):
+            nonlocal selected_marriage_id
+            selected_indices = marriage_listbox.curselection()
+            if selected_indices:
+                selected_marriage = marriage_listbox.get(selected_indices)
+                selected_marriage_id = int(selected_marriage.split(":")[0].split()[1])  # Extract marriage ID
+                husband_wife = selected_marriage.split(":")[1].strip()
+                marriage_label.config(text=f"Selected Marriage: {husband_wife}")
+                print(f"Selected Marriage ID: {selected_marriage_id}")
+
+        # Event handler for person selection
         def on_select_person(event):
-            selected_person_indices = person_listbox.curselection()
-            if selected_person_indices:
-                selected_person = person_listbox.get(selected_person_indices)
-                print(f"Selected Person: {selected_person}")
+            nonlocal selected_person_id
+            selected_indices = person_listbox.curselection()
+            if selected_indices:
+                selected_person = person_listbox.get(selected_indices)
+                selected_person_id = int(selected_person.split(":")[0])  # Extract person ID
+                person_name = selected_person.split(":")[1].strip()
+                person_label.config(text=f"Selected Person: {person_name}")
+                print(f"Selected Person ID: {selected_person_id}")
 
         marriage_listbox.bind('<<ListboxSelect>>', on_select_marriage)
         person_listbox.bind('<<ListboxSelect>>', on_select_person)
+
+        # Button to save child relationship
+        def save_child():
+            if selected_marriage_id and selected_person_id:
+                try:
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+
+                    # Insert relationship into 'family' table (assume this is the child of the selected marriage)
+                    cursor.execute(
+                        "INSERT INTO family (id_parent1, id_parent2, id_child) VALUES (?, ?, ?)",
+                        (marriage_records[selected_marriage_id - 1][1], marriage_records[selected_marriage_id - 1][2], selected_person_id)
+                    )
+                    conn.commit()
+                    print(f"Child {selected_person_id} added to Marriage ID: {selected_marriage_id}")
+                    conn.close()
+
+                except sqlite3.Error as e:
+                    print(f"Failed to save child: {e}")
+            else:
+                print("Please select both a marriage and a person.")
+
+        save_button = tk.Button(child_window, text="Save Child", command=save_child)
+        save_button.pack(pady=10)
 
         conn.close()
 
