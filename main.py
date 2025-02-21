@@ -4,6 +4,65 @@ from tkinter import simpledialog
 from tkinter import filedialog
 import sqlite3
 import os
+import networkx as nx
+import matplotlib.pyplot as plt
+
+def draw_family_tree():
+    if db_path is None:
+        print("Database has not been opened or created.")
+        return
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Pobierz dane z tabeli 'family' (rodzice, dzieci)
+        cursor.execute("SELECT id_parent1, id_parent2, id_child FROM family")
+        family_records = cursor.fetchall()
+
+        if not family_records:
+            print("No family records found.")
+            return
+
+        # Tworzenie grafu
+        G = nx.DiGraph()
+
+        for record in family_records:
+            parent1_id, parent2_id, child_id = record
+
+            # Pobieranie imion rodziców i dziecka
+            cursor.execute("SELECT surname, given FROM person WHERE id = ?", (parent1_id,))
+            parent1 = cursor.fetchone()
+            cursor.execute("SELECT surname, given FROM person WHERE id = ?", (parent2_id,))
+            parent2 = cursor.fetchone()
+            cursor.execute("SELECT surname, given FROM person WHERE id = ?", (child_id,))
+            child = cursor.fetchone()
+
+            if parent1 and parent2 and child:
+                parent1_name = f"{parent1[0]} {parent1[1]}"
+                parent2_name = f"{parent2[0]} {parent2[1]}"
+                child_name = f"{child[0]} {child[1]}"
+
+                # Dodawanie wierzchołków i krawędzi do grafu
+                G.add_node(parent1_name)
+                G.add_node(parent2_name)
+                G.add_node(child_name)
+                G.add_edge(parent1_name, child_name)
+                G.add_edge(parent2_name, child_name)
+
+        conn.close()
+
+        # Rysowanie grafu
+        plt.figure(figsize=(10, 8))
+        pos = nx.spring_layout(G)
+        nx.draw(G, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold")
+        plt.title("Family Tree")
+        plt.show()
+
+    except sqlite3.Error as e:
+        print(f"Error fetching data: {e}")
+
+# Inne funkcje programu (otwieranie bazy, dodawanie osób, małżeństw, dzieci) pozostają bez zmian.
 
 
 def open_new_window():
@@ -418,5 +477,6 @@ menu_bar.add_cascade(label="Add", menu=add_menu)
 add_menu.add_command(label="Person", command=open_person_window)  # Function to open the add person window
 add_menu.add_command(label="Marriage", command=open_marriage_window)  # Function to open the add marriage window
 add_menu.add_command(label="Child", command=open_child_window)  # Function to open the add child window
+add_menu.add_command(label="Family Tree", command=draw_family_tree)
 
 window.mainloop()
