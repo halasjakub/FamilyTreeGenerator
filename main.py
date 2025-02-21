@@ -228,7 +228,20 @@ def open_relation_window():
             nonlocal male_id, female_id
 
             if male_id and female_id:
-                print(f"Relation saved between Male ID: {male_id} and Female ID: {female_id}")
+                try:
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+
+                    cursor.execute(
+                        "INSERT INTO marriage (id_husband, id_wife) VALUES (?, ?)",
+                        (male_id, female_id)
+                    )
+                    conn.commit()
+                    print(f"Relation saved between Male ID: {male_id} and Female ID: {female_id}")
+                    conn.close()
+
+                except sqlite3.Error as e:
+                    print(f"Failed to save relation: {e}")
             else:
                 print("Please select both a male and a female.")
 
