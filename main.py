@@ -5,7 +5,6 @@ from tkinter import filedialog
 import sqlite3
 import os
 
-
 def open_new_window():
     global db_path  # Using a global variable to store the database path
 
@@ -37,7 +36,7 @@ def open_new_window():
             # Create the "marriage" table if it doesn't exist
             create_marriage_table_query = '''
                 CREATE TABLE IF NOT EXISTS marriage (
-                    id_relation INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_marriage INTEGER PRIMARY KEY AUTOINCREMENT,
                     id_husband INTEGER NOT NULL,
                     id_wife INTEGER NOT NULL,
                     FOREIGN KEY (id_husband) REFERENCES person(id),
@@ -50,7 +49,6 @@ def open_new_window():
             conn.close()  # Close the connection
         except sqlite3.Error as e:
             print(f"Failed to create database: {e}")
-
 
 def open_existing_file():
     global db_path  # Using a global variable to store the database path
@@ -82,13 +80,13 @@ def open_existing_file():
                 print("No records in the 'person' table.")
 
             # SQL query to get the first 10 records from the marriage table
-            cursor.execute("SELECT id_relation, id_husband, id_wife FROM marriage LIMIT 10")
-            relation_records = cursor.fetchall()
+            cursor.execute("SELECT id_marriage, id_husband, id_wife FROM marriage LIMIT 10")
+            marriage_records = cursor.fetchall()
 
             # Display the first 10 records from the marriage table in the terminal
-            if relation_records:
+            if marriage_records:
                 print("\nFirst 10 records from 'marriage' table:")
-                for record in relation_records:
+                for record in marriage_records:
                     print(record)
             else:
                 print("No records in the 'marriage' table.")
@@ -96,7 +94,6 @@ def open_existing_file():
             conn.close()  # Close the connection
         except sqlite3.Error as e:
             print(f"Failed to open database: {e}")
-
 
 def open_person_window():
     # Function to open a window for entering person data
@@ -162,15 +159,14 @@ def open_person_window():
     save_button = tk.Button(person_window, text="Save Person", command=save_person)
     save_button.pack()
 
-
-def open_relation_window():
+def open_marriage_window():
     if db_path is None:
         print("Database has not been opened or created.")
         return
 
-    relation_window = tk.Toplevel(window)
-    relation_window.title("Add Relation")
-    relation_window.geometry("400x300")
+    marriage_window = tk.Toplevel(window)
+    marriage_window.title("Add Marriage")
+    marriage_window.geometry("400x300")
 
     try:
         conn = sqlite3.connect(db_path)
@@ -183,7 +179,7 @@ def open_relation_window():
         female_records = cursor.fetchall()
 
         if male_records:
-            male_listbox = tk.Listbox(relation_window)
+            male_listbox = tk.Listbox(marriage_window)
             male_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
             for record in male_records:
@@ -193,7 +189,7 @@ def open_relation_window():
             print("No male records in the 'person' table.")
 
         if female_records:
-            female_listbox = tk.Listbox(relation_window)
+            female_listbox = tk.Listbox(marriage_window)
             female_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
             for record in female_records:
@@ -205,10 +201,10 @@ def open_relation_window():
         male_id = None
         female_id = None
 
-        male_label = tk.Label(relation_window, text="Selected Male: None")
+        male_label = tk.Label(marriage_window, text="Selected Male: None")
         male_label.pack(pady=10)
 
-        female_label = tk.Label(relation_window, text="Selected Female: None")
+        female_label = tk.Label(marriage_window, text="Selected Female: None")
         female_label.pack(pady=10)
 
         def on_male_selected(event):
@@ -234,7 +230,7 @@ def open_relation_window():
         male_listbox.bind('<<ListboxSelect>>', on_male_selected)
         female_listbox.bind('<<ListboxSelect>>', on_female_selected)
 
-        def save_relation():
+        def save_marriage():
             nonlocal male_id, female_id
 
             if male_id and female_id:
@@ -247,16 +243,66 @@ def open_relation_window():
                         (male_id, female_id)
                     )
                     conn.commit()
-                    print(f"Relation saved between Male ID: {male_id} and Female ID: {female_id}")
+                    print(f"Marriage saved between Male ID: {male_id} and Female ID: {female_id}")
                     conn.close()
 
                 except sqlite3.Error as e:
-                    print(f"Failed to save relation: {e}")
+                    print(f"Failed to save marriage: {e}")
             else:
                 print("Please select both a male and a female.")
 
-        save_button = tk.Button(relation_window, text="Save Relation", command=save_relation)
+        save_button = tk.Button(marriage_window, text="Save Marriage", command=save_marriage)
         save_button.pack(pady=10)
+
+        conn.close()
+
+    except sqlite3.Error as e:
+        print(f"Failed to retrieve data: {e}")
+
+
+def open_child_window():
+    if db_path is None:
+        print("Database has not been opened or created.")
+        return
+
+    child_window = tk.Toplevel(window)
+    child_window.title("Add Child")
+    child_window.geometry("400x300")
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id_marriage, id_husband, id_wife FROM marriage")
+        marriage_records = cursor.fetchall()
+
+        cursor.execute("SELECT id, surname, given FROM person")
+        person_records = cursor.fetchall()
+
+        marriage_listbox = tk.Listbox(child_window)
+        marriage_listbox.pack(side=tk.LEFT, padx=20, pady=20)
+        for record in marriage_records:
+            marriage_listbox.insert(tk.END, f"Marriage {record[0]}: Husband {record[1]}, Wife {record[2]}")
+
+        person_listbox = tk.Listbox(child_window)
+        person_listbox.pack(side=tk.LEFT, padx=20, pady=20)
+        for record in person_records:
+            person_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
+
+        def on_select_marriage(event):
+            selected_marriage_indices = marriage_listbox.curselection()
+            if selected_marriage_indices:
+                selected_marriage = marriage_listbox.get(selected_marriage_indices)
+                print(f"Selected Marriage: {selected_marriage}")
+
+        def on_select_person(event):
+            selected_person_indices = person_listbox.curselection()
+            if selected_person_indices:
+                selected_person = person_listbox.get(selected_person_indices)
+                print(f"Selected Person: {selected_person}")
+
+        marriage_listbox.bind('<<ListboxSelect>>', on_select_marriage)
+        person_listbox.bind('<<ListboxSelect>>', on_select_person)
 
         conn.close()
 
@@ -286,6 +332,7 @@ file_menu.add_command(label="Close")
 add_menu = Menu(menu_bar, tearoff=False)
 menu_bar.add_cascade(label="Add", menu=add_menu)
 add_menu.add_command(label="Person", command=open_person_window)  # Function to open the add person window
-add_menu.add_command(label="Relation", command=open_relation_window)  # Function to open the add relation window
+add_menu.add_command(label="Marriage", command=open_marriage_window)  # Function to open the add marriage window
+add_menu.add_command(label="Child", command=open_child_window)  # Function for the child window
 
 window.mainloop()
