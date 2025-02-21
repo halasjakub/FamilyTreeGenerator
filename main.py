@@ -5,6 +5,7 @@ from tkinter import filedialog
 import sqlite3
 import os
 
+
 def open_new_window():
     global db_path  # Using a global variable to store the database path
 
@@ -46,9 +47,25 @@ def open_new_window():
             conn.execute(create_marriage_table_query)
             print("Table 'marriage' created.")
 
+            # Create the "family" table if it doesn't exist
+            create_family_table_query = '''
+                CREATE TABLE IF NOT EXISTS family (
+                    id_family INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id_parent1 INTEGER NOT NULL,
+                    id_parent2 INTEGER NOT NULL,
+                    id_child INTEGER NOT NULL,
+                    FOREIGN KEY (id_parent1) REFERENCES person(id),
+                    FOREIGN KEY (id_parent2) REFERENCES person(id),
+                    FOREIGN KEY (id_child) REFERENCES person(id)
+                );
+            '''
+            conn.execute(create_family_table_query)
+            print("Table 'family' created.")
+
             conn.close()  # Close the connection
         except sqlite3.Error as e:
             print(f"Failed to create database: {e}")
+
 
 def open_existing_file():
     global db_path  # Using a global variable to store the database path
@@ -91,9 +108,22 @@ def open_existing_file():
             else:
                 print("No records in the 'marriage' table.")
 
+            # SQL query to get the first 10 records from the family table
+            cursor.execute("SELECT id_family, id_parent1, id_parent2, id_child FROM family LIMIT 10")
+            family_records = cursor.fetchall()
+
+            # Display the first 10 records from the family table in the terminal
+            if family_records:
+                print("\nFirst 10 records from 'family' table:")
+                for record in family_records:
+                    print(record)
+            else:
+                print("No records in the 'family' table.")
+
             conn.close()  # Close the connection
         except sqlite3.Error as e:
             print(f"Failed to open database: {e}")
+
 
 def open_person_window():
     # Function to open a window for entering person data
@@ -158,6 +188,7 @@ def open_person_window():
     # Button to save the data
     save_button = tk.Button(person_window, text="Save Person", command=save_person)
     save_button.pack()
+
 
 def open_marriage_window():
     if db_path is None:
@@ -273,38 +304,74 @@ def open_child_window():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id_marriage, id_husband, id_wife FROM marriage")
-        marriage_records = cursor.fetchall()
+        cursor.execute("SELECT id, surname, given FROM person WHERE gender = 'male'")
+        male_records = cursor.fetchall()
 
-        cursor.execute("SELECT id, surname, given FROM person")
-        person_records = cursor.fetchall()
+        cursor.execute("SELECT id, surname, given FROM person WHERE gender = 'female'")
+        female_records = cursor.fetchall()
 
-        marriage_listbox = tk.Listbox(child_window)
-        marriage_listbox.pack(side=tk.LEFT, padx=20, pady=20)
-        for record in marriage_records:
-            marriage_listbox.insert(tk.END, f"Marriage {record[0]}: Husband {record[1]}, Wife {record[2]}")
+        if male_records:
+            male_listbox = tk.Listbox(child_window)
+            male_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
-        person_listbox = tk.Listbox(child_window)
-        person_listbox.pack(side=tk.LEFT, padx=20, pady=20)
-        for record in person_records:
-            person_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
+            for record in male_records:
+                male_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
 
-        def on_select_marriage(event):
-            selected_marriage_indices = marriage_listbox.curselection()
-            if selected_marriage_indices:
-                selected_marriage = marriage_listbox.get(selected_marriage_indices)
-                print(f"Selected Marriage: {selected_marriage}")
+        if female_records:
+            female_listbox = tk.Listbox(child_window)
+            female_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
-        def on_select_person(event):
-            selected_person_indices = person_listbox.curselection()
-            if selected_person_indices:
-                selected_person = person_listbox.get(selected_person_indices)
-                print(f"Selected Person: {selected_person}")
+            for record in female_records:
+                female_listbox.insert(tk.END, f"{record[0]}: {record[1]} {record[2]}")
 
-        marriage_listbox.bind('<<ListboxSelect>>', on_select_marriage)
-        person_listbox.bind('<<ListboxSelect>>', on_select_person)
+        child_listbox = tk.Listbox(child_window)
+        child_listbox.pack(side=tk.LEFT, padx=20, pady=20)
 
-        conn.close()
+        child_id = None
+        parent1_id = None
+        parent2_id = None
+
+        def on_male_selected(event):
+            nonlocal parent1_id
+            selected_male_indices = male_listbox.curselection()
+            if selected_male_indices:
+                selected_male = male_listbox.get(selected_male_indices)
+                parent1_id = selected_male.split(":")[0]
+                parent_name = selected_male.split(":")[1].strip()
+
+        def on_female_selected(event):
+            nonlocal parent2_id
+            selected_female_indices = female_listbox.curselection()
+            if selected_female_indices:
+                selected_female = female_listbox.get(selected_female_indices)
+                parent2_id = selected_female.split(":")[0]
+
+        def on_child_selected(event):
+            nonlocal child_id
+            selected_child_indices = child_listbox.curselection()
+            if selected_child_indices:
+                selected_child = child_listbox.get(selected_child_indices)
+                child_id = selected_child.split(":")[0]
+
+        def save_child():
+            if parent1_id and parent2_id and child_id:
+                try:
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+
+                    cursor.execute(
+                        "INSERT INTO family (id_parent1, id_parent2, id_child) VALUES (?, ?, ?)",
+                        (parent1_id, parent2_id, child_id)
+                    )
+                    conn.commit()
+                    print(f"Child added: Parent1 ID: {parent1_id}, Parent2 ID: {parent2_id}, Child ID: {child_id}")
+                    conn.close()
+
+                except sqlite3.Error as e:
+                    print(f"Failed to save child: {e}")
+
+        save_button = tk.Button(child_window, text="Save Child", command=save_child)
+        save_button.pack(pady=10)
 
     except sqlite3.Error as e:
         print(f"Failed to retrieve data: {e}")
@@ -333,6 +400,6 @@ add_menu = Menu(menu_bar, tearoff=False)
 menu_bar.add_cascade(label="Add", menu=add_menu)
 add_menu.add_command(label="Person", command=open_person_window)  # Function to open the add person window
 add_menu.add_command(label="Marriage", command=open_marriage_window)  # Function to open the add marriage window
-add_menu.add_command(label="Child", command=open_child_window)  # Function for the child window
+add_menu.add_command(label="Child", command=open_child_window)  # Function to open the add child window
 
 window.mainloop()
