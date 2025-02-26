@@ -16,7 +16,7 @@ def draw_family_tree():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # Pobierz dane z tabeli 'family' (rodzice, dzieci)
+        # Retrieve data from the 'family' table (parents, children)
         cursor.execute("SELECT id_parent1, id_parent2, id_child FROM family")
         family_records = cursor.fetchall()
 
@@ -24,13 +24,13 @@ def draw_family_tree():
             print("No family records found.")
             return
 
-        # Tworzenie grafu
+        # Create a graph
         G = nx.DiGraph()
 
         for record in family_records:
             parent1_id, parent2_id, child_id = record
 
-            # Pobieranie imion rodziców i dziecka
+            # Retrieve names of parents and the child
             cursor.execute("SELECT surname, given FROM person WHERE id = ?", (parent1_id,))
             parent1 = cursor.fetchone()
             cursor.execute("SELECT surname, given FROM person WHERE id = ?", (parent2_id,))
@@ -43,7 +43,7 @@ def draw_family_tree():
                 parent2_name = f"{parent2[0]} {parent2[1]}"
                 child_name = f"{child[0]} {child[1]}"
 
-                # Dodawanie wierzchołków i krawędzi do grafu
+                # Add nodes and edges to the graph
                 G.add_node(parent1_name)
                 G.add_node(parent2_name)
                 G.add_node(child_name)
@@ -52,7 +52,7 @@ def draw_family_tree():
 
         conn.close()
 
-        # Rysowanie grafu
+        # Draw the graph
         plt.figure(figsize=(10, 8))
         pos = nx.spring_layout(G)
         nx.draw(G, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold")
@@ -61,8 +61,6 @@ def draw_family_tree():
 
     except sqlite3.Error as e:
         print(f"Error fetching data: {e}")
-
-# Inne funkcje programu (otwieranie bazy, dodawanie osób, małżeństw, dzieci) pozostają bez zmian.
 
 
 def open_new_window():
@@ -397,86 +395,69 @@ def open_child_window():
             nonlocal selected_marriage_id
             selected_indices = marriage_listbox.curselection()
             if selected_indices:
-                selected_marriage = marriage_listbox.get(selected_indices)
-                selected_marriage_id = int(selected_marriage.split(":")[0].split()[1])  # Extract marriage ID
-                husband_wife = selected_marriage.split(":")[1].strip()
-                marriage_label.config(text=f"Selected Marriage: {husband_wife}")
+                selected_record = marriage_listbox.get(selected_indices)
+                selected_marriage_id = selected_record.split(":")[0]
+                marriage_label.config(text=f"Selected Marriage ID: {selected_marriage_id}")
                 print(f"Selected Marriage ID: {selected_marriage_id}")
 
-        # Event handler for person selection
+        # Event handler for person (child) selection
         def on_select_person(event):
             nonlocal selected_person_id
             selected_indices = person_listbox.curselection()
             if selected_indices:
-                selected_person = person_listbox.get(selected_indices)
-                selected_person_id = int(selected_person.split(":")[0])  # Extract person ID
-                person_name = selected_person.split(":")[1].strip()
-                person_label.config(text=f"Selected Person: {person_name}")
+                selected_record = person_listbox.get(selected_indices)
+                selected_person_id = selected_record.split(":")[0]
+                person_label.config(text=f"Selected Person ID: {selected_person_id}")
                 print(f"Selected Person ID: {selected_person_id}")
 
         marriage_listbox.bind('<<ListboxSelect>>', on_select_marriage)
         person_listbox.bind('<<ListboxSelect>>', on_select_person)
 
-        # Button to save child relationship
         def save_child():
             if selected_marriage_id and selected_person_id:
                 try:
                     conn = sqlite3.connect(db_path)
                     cursor = conn.cursor()
 
-                    # Get husband and wife IDs from the selected marriage
-                    husband_id = marriage_records[selected_marriage_id - 1][1]
-                    wife_id = marriage_records[selected_marriage_id - 1][2]
-
-                    # Insert the child into the 'family' table
-                    cursor.execute(
-                        "INSERT INTO family (id_parent1, id_parent2, id_child) VALUES (?, ?, ?)",
-                        (husband_id, wife_id, selected_person_id)
-                    )
+                    cursor.execute("INSERT INTO family (id_parent1, id_parent2, id_child) VALUES (?, ?, ?)",
+                                   (selected_marriage_id[1], selected_marriage_id[2], selected_person_id))
                     conn.commit()
-
-                    print(f"Child {selected_person_id} added to Marriage ID: {selected_marriage_id} (Husband: {husband_id}, Wife: {wife_id})")
-
+                    print(f"Child saved for marriage {selected_marriage_id}")
                     conn.close()
 
                 except sqlite3.Error as e:
                     print(f"Failed to save child: {e}")
             else:
-                print("Please select both a marriage and a person.")
+                print("Select both marriage and child.")
 
         save_button = tk.Button(child_window, text="Save Child", command=save_child)
         save_button.pack(pady=10)
 
         conn.close()
-
     except sqlite3.Error as e:
         print(f"Failed to retrieve data: {e}")
 
 
 window = tk.Tk()
-window.title("Family Tree Generator")
-window.geometry("800x600")
+window.title("Family Tree Application")
+window.geometry("400x300")
 
-# Path to the database (initially None, will change after creating or opening the database)
-db_path = None
+menu = Menu(window)
+window.config(menu=menu)
 
-# Set up the main window
-menu_bar = Menu(window)
-window.config(menu=menu_bar)
+file_menu = Menu(menu, tearoff=0)
+menu.add_cascade(label="File", menu=file_menu)
+file_menu.add_command(label="Open Existing Database", command=open_existing_file)
+file_menu.add_command(label="Create New Database", command=open_new_window)
 
-# File options
-file_menu = Menu(menu_bar, tearoff=False)
-menu_bar.add_cascade(label="File", menu=file_menu)
-file_menu.add_command(label="New", command=open_new_window)  # Function activated by the New button
-file_menu.add_command(label="Open", command=open_existing_file)  # Function activated by the Open button
-file_menu.add_command(label="Close")
+add_menu = Menu(menu, tearoff=0)
+menu.add_cascade(label="Add", menu=add_menu)
+add_menu.add_command(label="Add Person", command=open_person_window)
+add_menu.add_command(label="Add Marriage", command=open_marriage_window)
+add_menu.add_command(label="Add Child", command=open_child_window)
 
-# Add options
-add_menu = Menu(menu_bar, tearoff=False)
-menu_bar.add_cascade(label="Add", menu=add_menu)
-add_menu.add_command(label="Person", command=open_person_window)  # Function to open the add person window
-add_menu.add_command(label="Marriage", command=open_marriage_window)  # Function to open the add marriage window
-add_menu.add_command(label="Child", command=open_child_window)  # Function to open the add child window
-add_menu.add_command(label="Family Tree", command=draw_family_tree)
+view_menu = Menu(menu, tearoff=0)
+menu.add_cascade(label="View", menu=view_menu)
+view_menu.add_command(label="Draw Family Tree", command=draw_family_tree)
 
 window.mainloop()
