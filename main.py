@@ -7,6 +7,7 @@ import os
 import networkx as nx
 import matplotlib.pyplot as plt
 
+
 def draw_family_tree():
     if db_path is None:
         print("Database has not been opened or created.")
@@ -27,6 +28,12 @@ def draw_family_tree():
         # Create a graph
         G = nx.DiGraph()
 
+        # Create a dictionary to hold the generation level for each person
+        generations = {}
+        fathers = {}  # Dictionary to store fathers and their children
+        mothers = {}  # Dictionary to store mothers and their children
+
+        # Add initial nodes and generations based on the family records
         for record in family_records:
             parent1_id, parent2_id, child_id = record
 
@@ -39,25 +46,61 @@ def draw_family_tree():
             child = cursor.fetchone()
 
             if parent1 and parent2 and child:
-                parent1_name = f"{parent1[0]} {parent1[1]}"
-                parent2_name = f"{parent2[0]} {parent2[1]}"
+                parent1_name = f"{parent1[0]} {parent1[1]}"  # Father
+                parent2_name = f"{parent2[0]} {parent2[1]}"  # Mother
                 child_name = f"{child[0]} {child[1]}"
 
-                # Add nodes and edges to the graph
+                # Add nodes to the graph
                 G.add_node(parent1_name)
                 G.add_node(parent2_name)
                 G.add_node(child_name)
+
+                # Add edges to represent the parent-child relationship
                 G.add_edge(parent1_name, child_name)
                 G.add_edge(parent2_name, child_name)
 
-        conn.close()
+                # Set generations for the child and parents
+                if child_name not in generations:
+                    generations[child_name] = 0  # The child is at generation 0
+                if parent1_name not in generations:
+                    generations[parent1_name] = generations[child_name] - 1  # Parent is one generation older
+                if parent2_name not in generations:
+                    generations[parent2_name] = generations[child_name] - 1  # Parent is one generation older
 
-        # Draw the graph
-        plt.figure(figsize=(10, 8))
-        pos = nx.spring_layout(G)
-        nx.draw(G, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold")
+                # Group fathers and mothers separately
+                if parent1_name not in fathers:
+                    fathers[parent1_name] = []
+                fathers[parent1_name].append(child_name)
+
+                if parent2_name not in mothers:
+                    mothers[parent2_name] = []
+                mothers[parent2_name].append(child_name)
+
+        # Now, compute the layout
+        pos = {}
+        for person, generation in generations.items():
+            if person in fathers:
+                # Fathers are placed on the left side (negative x-axis)
+                pos[person] = (-generation, generations.get(person, 0))
+            elif person in mothers:
+                # Mothers are placed on the right side (positive x-axis)
+                pos[person] = (generation, generations.get(person, 0))
+            else:
+                # If the person is neither a father nor a mother, place them in the middle
+                pos[person] = (0, generations.get(person, 0))  # (generation, horizontal position)
+
+        # Draw the graph with adjusted layout
+        plt.figure(figsize=(12, 10))
+        nx.draw(G, pos, with_labels=True, node_size=3000, node_color="lightblue", font_size=10, font_weight="bold", arrows=True)
+
+        # Add title
         plt.title("Family Tree")
+
+        # Show the plot
         plt.show()
+
+        # Close the connection to the database
+        conn.close()
 
     except sqlite3.Error as e:
         print(f"Error fetching data: {e}")
@@ -447,17 +490,17 @@ window.config(menu=menu)
 
 file_menu = Menu(menu, tearoff=0)
 menu.add_cascade(label="File", menu=file_menu)
-file_menu.add_command(label="Open Existing Database", command=open_existing_file)
-file_menu.add_command(label="Create New Database", command=open_new_window)
+file_menu.add_command(label="Open", command=open_existing_file)
+file_menu.add_command(label="New", command=open_new_window)
 
 add_menu = Menu(menu, tearoff=0)
 menu.add_cascade(label="Add", menu=add_menu)
-add_menu.add_command(label="Add Person", command=open_person_window)
-add_menu.add_command(label="Add Marriage", command=open_marriage_window)
-add_menu.add_command(label="Add Child", command=open_child_window)
+add_menu.add_command(label="Person", command=open_person_window)
+add_menu.add_command(label="Marriage", command=open_marriage_window)
+add_menu.add_command(label="Child", command=open_child_window)
 
 view_menu = Menu(menu, tearoff=0)
 menu.add_cascade(label="View", menu=view_menu)
-view_menu.add_command(label="Draw Family Tree", command=draw_family_tree)
+view_menu.add_command(label="Family Tree", command=draw_family_tree)
 
 window.mainloop()
